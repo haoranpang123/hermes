@@ -115,7 +115,7 @@
 </template>
 
 <script>
-import { mockTeachers, mockFilterOptions } from '@/common/mock.js'
+import { getPaginated } from '@/utils/api.js'
 
 export default {
   data() {
@@ -129,21 +129,32 @@ export default {
       teacherList: [],
       page: 1,
       pageSize: 10,
+      totalPages: 1,
       loading: false,
       loadStatus: 'loadmore', // loadmore | loading | nomore
 
-      // 筛选选项
+      // 筛选选项（从后端动态加载，保留常用备选）
       subjectOptions: [
         { label: '全部科目', value: '' },
-        ...mockFilterOptions.subjects.map(s => ({ label: s, value: s })),
+        { label: '数学', value: '数学' },
+        { label: '英语', value: '英语' },
+        { label: '物理', value: '物理' },
+        { label: '化学', value: '化学' },
+        { label: '语文', value: '语文' },
       ],
       gradeOptions: [
         { label: '全部年级', value: '' },
-        ...mockFilterOptions.grades.map(g => ({ label: g, value: g })),
+        { label: '小学', value: '小学' },
+        { label: '初中', value: '初中' },
+        { label: '高中', value: '高中' },
       ],
       regionOptions: [
         { label: '全部地区', value: '' },
-        ...mockFilterOptions.regions.map(r => ({ label: r, value: r })),
+        { label: '龙亭区', value: '龙亭区' },
+        { label: '顺河区', value: '顺河区' },
+        { label: '鼓楼区', value: '鼓楼区' },
+        { label: '禹王台区', value: '禹王台区' },
+        { label: '金明区', value: '金明区' },
       ],
     }
   },
@@ -155,112 +166,125 @@ export default {
   // 下拉刷新
   onPullDownRefresh() {
     this.page = 1
-    this.loadTeachers()
-    uni.stopPullDownRefresh()
+    this.loadTeachers().finally(() => {
+      uni.stopPullDownRefresh()
+    })
   },
 
   // 上拉加载
   onReachBottom() {
-    if (this.loadStatus === 'nomore') return
+    if (this.loadStatus === 'nomore' || this.loading) return
+    if (this.page >= this.totalPages) return
     this.page++
     this.loadTeachers(true)
   },
 
   methods: {
     /**
-     * 加载教师列表
-     * 后续替换为 GET /teachers API
+     * 加载教师列表 — 调用 GET /api/v1/teachers
      */
-    loadTeachers(append = false) {
+    async loadTeachers(append = false) {
       if (this.loading) return
       this.loading = true
       this.loadStatus = 'loading'
 
-      // 模拟API延迟
-      setTimeout(() => {
-        let data = [...mockTeachers]
-
-        // 关键词搜索
-        if (this.keyword) {
-          const kw = this.keyword.toLowerCase()
-          data = data.filter(t =>
-            t.nickname.includes(kw) ||
-            t.subjects.some(s => s.includes(kw)) ||
-            t.major.includes(kw)
-          )
+      try {
+        const params = {
+          page: this.page,
+          page_size: this.pageSize,
         }
+        if (this.keyword) params.keyword = this.keyword
+        if (this.filters.subject) params.subjects = this.filters.subject
+        if (this.filters.grade) params.grade_level = this.filters.grade
+        if (this.filters.region) params.region = this.filters.region
 
-        // 科目筛选
-        if (this.filters.subject) {
-          data = data.filter(t =>
-            t.subjects.some(s => s.includes(this.filters.subject))
-          )
-        }
+        const result = await getPaginated('/api/v1/teachers', params)
 
-        // 年级筛选
-        if (this.filters.grade) {
-          data = data.filter(t =>
-            t.subjects.some(s => s.includes(this.filters.grade))
-          )
-        }
-
-        // 地区筛选
-        if (this.filters.region) {
-          data = data.filter(t =>
-            t.teaching_regions.includes(this.filters.region)
-          )
-        }
-
-        // 分页
-        const start = (this.page - 1) * this.pageSize
-        const pageData = data.slice(start, start + this.pageSize)
+        // 将后端字段映射到模板字段
+        const items = result.items.map(mapTeacherItem)
 
         if (append) {
-          this.teacherList = [...this.teacherList, ...pageData]
+          this.teacherList = [...this.teacherList, ...items]
         } else {
-          this.teacherList = pageData
+          this.teacherList = items
         }
 
-        // 判断是否还有更多
-        this.loadStatus = (start + this.pageSize >= data.length) ? 'nomore' : 'loadmore'
+        this.totalPages = result.total_pages || 1
+        this.loadStatus = (this.page >= this.totalPages) ? 'nomore' : 'loadmore'
+      } catch (e) {
+        console.error('加载教师列表失败:', e)
+        this.loadStatus = 'loadmore'
+      } finally {
         this.loading = false
-      }, 300)
+      }
     },
 
-    /**
-     * 搜索
-     */
+    /** 搜索 */
     onSearch() {
       this.page = 1
       this.loadTeachers()
     },
 
-    /**
-     * 清除搜索
-     */
+    /** 清除搜索 */
     onClear() {
       this.keyword = ''
       this.page = 1
       this.loadTeachers()
     },
 
-    /**
-     * 筛选条件变更
-     */
+    /** 筛选条件变更 */
     onFilterChange() {
       this.page = 1
       this.loadTeachers()
     },
 
-    /**
-     * 跳转教师详情
-     */
+    /** 跳转教师详情 */
     goToDetail(teacherId) {
       uni.navigateTo({
         url: `/pages/teacher/detail?id=${teacherId}`,
       })
     },
   },
+}
+
+/**
+ * 将后端教师列表项映射为模板需要的字段
+ */
+function mapTeacherItem(item) {
+  const subjects = item.subjects || []
+  const regions = item.teaching_regions || []
+  const name = item.nickname || ''
+  return {
+    teacher_id: item.teacher_id,
+    nickname: name,
+    avatar_url: item.avatar_url || '',
+    avatar_bg: item.avatar_bg || randomAvatarBg(item.teacher_id),
+    initial: name ? name[0] : '?',
+    university: item.university || '',
+    major: item.major || '',
+    grade: item.grade || '',
+    subjects: subjects.map(s => (typeof s === 'string' ? s : s.subject || s)),
+    min_price: item.min_price || 0,
+    avg_rating: item.avg_rating ? parseFloat(item.avg_rating).toFixed(1) : '0.0',
+    review_count: item.review_count || 0,
+    is_available: item.is_available,
+    teaching_regions: regions,
+    gender: item.gender || '',
+    bio: item.bio || '',
+  }
+}
+
+/** 根据 teacher_id 生成一个随机渐变色 */
+function randomAvatarBg(id) {
+  const colors = [
+    'linear-gradient(135deg, #FF6B6B, #EE5A24)',
+    'linear-gradient(135deg, #4ECDC4, #44BD32)',
+    'linear-gradient(135deg, #A29BFE, #6C5CE7)',
+    'linear-gradient(135deg, #FDCB6E, #F39C12)',
+    'linear-gradient(135deg, #55E7FC, #0093E9)',
+    'linear-gradient(135deg, #FD79A8, #E84393)',
+  ]
+  return colors[(id || 1) % colors.length]
 }
 </script>
 
