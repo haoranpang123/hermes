@@ -1,40 +1,43 @@
-"""
-河大家教小程序 — SQLAlchemy 数据模型包
+"""SQLAlchemy 模型基类和汇总导出"""
 
-所有数据库模型的基类和统一导出。
-"""
+from sqlalchemy.orm import DeclarativeBase
 
-from sqlalchemy.orm import declarative_base
 
-# SQLAlchemy 2.0 声明式基类
-Base = declarative_base()
+class Base(DeclarativeBase):
+    """SQLAlchemy 2.0 声明式基类"""
+    pass
 
-# 延迟导入模型，避免循环引用
-# 在实际开发中，取消注释并创建对应模块：
 
-# from app.models.user import User
-# from app.models.teacher import Teacher, TeacherCertificate, TeacherSubject, TeacherSchedule
-# from app.models.order import Order
-# from app.models.wallet import Wallet, WalletTransaction
-# from app.models.review import Review
-# from app.models.demand import ParentDemand
-# from app.models.favorite import Favorite
-# from app.models.withdrawal import WithdrawalRequest
-# from app.models.system_config import SystemConfig
+# 所有模型在此集中导入，确保 Alembic 能发现
+from app.models.user import User
+from app.models.admin_user import AdminUser
+from app.models.teacher import Teacher
+from app.models.teacher_certificate import TeacherCertificate
+from app.models.teacher_subject import TeacherSubject
+from app.models.teacher_schedule import TeacherSchedule
+from app.models.order import Order
+from app.models.wallet import Wallet
+from app.models.wallet_transaction import WalletTransaction
+from app.models.review import Review
+from app.models.favorite import Favorite
+from app.models.parent_demand import ParentDemand
+from app.models.withdrawal_request import WithdrawalRequest
+from app.models.system_config import SystemConfig
 
 __all__ = [
     "Base",
-    # "User",
-    # "Teacher",
-    # "TeacherCertificate",
-    # "TeacherSubject",
-    # "TeacherSchedule",
-    # "Order",
-    # "Wallet",
-    # "WalletTransaction",
-    # "Review",
-    # "ParentDemand",
-    # "Favorite",
-    # "WithdrawalRequest",
-    # "SystemConfig",
+    "User",
+    "AdminUser",
+    "Teacher",
+    "TeacherCertificate",
+    "TeacherSubject",
+    "TeacherSchedule",
+    "Order",
+    "Wallet",
+    "WalletTransaction",
+    "Review",
+    "Favorite",
+    "ParentDemand",
+    "WithdrawalRequest",
+    "SystemConfig",
 ]
