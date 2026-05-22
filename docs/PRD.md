@@ -484,6 +484,203 @@ is_available (当前是否有可预约时间)
 
 ---
 
+### 3.10 地址管理
+
+**优先级：P0**
+
+#### 功能概述
+
+地址管理模块用于家长在发布需求或下单时精确选择授课地址。支持手动输入地址、微信地图定位、历史地址快捷选择三种方式。家长可管理常用地址列表（新增/编辑/删除），教师端查看订单时可看到授课地址。
+
+#### 用户故事
+
+> 作为一个家长，我希望下单时能方便地选择上课地址——可以直接在地图上拖拽定位，也可以从常用地址中一键选择，不用每次都重新输入。
+
+> 作为一个教师，我希望接单后能清楚看到授课地址和导航指引，方便我提前规划出行。
+
+#### 交互流程
+
+**场景A：首次使用 → 微信地图定位**
+
+```
+下单页/发布需求页 → 点击"选择授课地址"
+  → 弹出地址选择弹窗
+    [使用微信地图定位] [手动输入地址] [历史地址]
+  [微信地图定位] → 调用 wx.chooseLocation() 打开微信原生地图
+    → 用户搜索/拖拽/缩放地图选点
+    → 返回: { name: "龙亭区XX小区", address: "开封市龙亭区XX路XX号", latitude: 34.xxx, longitude: 114.xxx }
+    → 自动填入下单/需求表单
+    → 同时保存到"我的常用地址"
+```
+
+**场景B：已有常用地址 → 一键选择**
+
+```
+下单页 → 点击"选择授课地址"
+  → 展示"我的常用地址"列表（最多20条）
+    ┌────────────────────────────────┐
+    │ 📍 龙亭区XX小区                │
+    │    开封市龙亭区XX路XX号        │  [选择]
+    ├────────────────────────────────┤
+    │ 📍 金明区YY小区                │
+    │    开封市金明区YY路YY号        │  [选择]
+    ├────────────────────────────────┤
+    │ 📍 河南大学明伦校区            │
+    │    顺河回族区明伦街85号        │  [选择]
+    ├────────────────────────────────┤
+    │ [+ 新增地址]                    │
+    └────────────────────────────────┘
+  → 选择后自动填入表单
+```
+
+**场景C：手动输入地址**
+
+```
+选择地址弹窗 → [手动输入地址]
+  → 地址输入框（省市区自动识别建议）
+  → 门牌号等详情补充
+  → 可选：地图标注确认位置
+  → 保存并填入
+```
+
+#### 页面元素
+
+**常用地址管理页（个人中心入口）**
+
+```
+┌──────────────────────────────┐
+│  ← 返回    我的常用地址    管理 │
+├──────────────────────────────┤
+│  📍 龙亭区XX小区              │
+│     开封市龙亭区XX路XX号       │
+│     [设为默认] [编辑] [删除]   │
+├──────────────────────────────┤
+│  📍 金明区YY小区              │
+│     开封市金明区YY路YY号       │
+│     [设为默认] [编辑] [删除]   │
+├──────────────────────────────┤
+│  ★ 河南大学明伦校区 (默认)     │
+│     顺河回族区明伦街85号       │
+│     [默认地址] [编辑] [删除]   │
+├──────────────────────────────┤
+│  [+ 添加新地址]                │
+└──────────────────────────────┘
+```
+
+**地址编辑页**
+
+```
+┌──────────────────────────────┐
+│  ← 返回         编辑地址      │
+├──────────────────────────────┤
+│  联系人姓名: [            ]   │
+│  联系电话:   [138****1234 ]   │
+│  所在地区:   [省/市/区 选择器] │
+│  详细地址:   [XX路XX号XX室 ]   │
+│  门牌号:     [3栋502       ]   │
+│                              │
+│  📍 地图标注 (精确位置可选)    │
+│  ┌────────────────────────┐  │
+│  │                        │  │
+│  │      [地图预览区域]      │  │
+│  │      📌 拖拽调整位置    │  │
+│  │                        │  │
+│  └────────────────────────┘  │
+│                              │
+│  地址标签:  [家] [学校] [其他] │
+│                              │
+│  [保存地址]                   │
+└──────────────────────────────┘
+```
+
+#### 数据字段
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| address_id | bigint | 主键，地址ID |
+| user_id | bigint | 所属用户ID |
+| contact_name | varchar(32) | 联系人姓名 |
+| contact_phone | varchar(11) | 联系电话（默认取绑定手机号） |
+| province | varchar(32) | 省 |
+| city | varchar(32) | 市 |
+| district | varchar(32) | 区 |
+| address | varchar(256) | 详细地址 |
+| address_detail | varchar(128) | 门牌号等补充 |
+| latitude | decimal(10,7) | 纬度（地图定位用） |
+| longitude | decimal(10,7) | 经度（地图定位用） |
+| tag | enum('home','school','other') | 地址标签 |
+| is_default | tinyint | 是否默认地址（每个用户仅1个） |
+| created_at | datetime | 创建时间 |
+| updated_at | datetime | 更新时间 |
+
+**对应数据库建表语句：**
+
+```sql
+CREATE TABLE `user_addresses` (
+    `address_id`      BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT COMMENT '地址ID',
+    `user_id`         BIGINT UNSIGNED  NOT NULL COMMENT '用户ID',
+    `contact_name`    VARCHAR(32)      NOT NULL COMMENT '联系人姓名',
+    `contact_phone`   VARCHAR(11)      NOT NULL COMMENT '联系电话',
+    `province`        VARCHAR(32)      NOT NULL COMMENT '省',
+    `city`            VARCHAR(32)      NOT NULL COMMENT '市',
+    `district`        VARCHAR(32)      NOT NULL COMMENT '区',
+    `address`         VARCHAR(256)     NOT NULL COMMENT '详细地址',
+    `address_detail`  VARCHAR(128)     DEFAULT NULL COMMENT '门牌号等补充',
+    `latitude`        DECIMAL(10,7)    DEFAULT NULL COMMENT '纬度',
+    `longitude`       DECIMAL(10,7)    DEFAULT NULL COMMENT '经度',
+    `tag`             ENUM('home','school','other') NOT NULL DEFAULT 'other' COMMENT '地址标签',
+    `is_default`      TINYINT          NOT NULL DEFAULT 0 COMMENT '是否默认地址',
+    `created_at`      DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`      DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`address_id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_is_default` (`user_id`, `is_default`),
+    CONSTRAINT `fk_addresses_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户地址表';
+```
+
+#### 业务规则
+
+1. **地址数量限制**：每位用户最多保存 20 个常用地址，超出需删除旧地址
+2. **默认地址**：每个用户只能设置一个默认地址；新设置的默认地址会自动取消旧默认
+3. **首次使用**：首次下单/发布需求时，微信授权后自动使用微信地图定位
+4. **地址复用**：在下单页和需求发布页均可选择常用地址，订单创建后地址快照保存到订单中（而非引用地址ID，防止地址被删后订单信息丢失）
+5. **隐私保护**：家长的完整地址仅在对教师可见的订单详情中展示（接单后），教师列表和需求列表中不展示完整地址
+6. **地图选点**：使用微信小程序原生 API `wx.chooseLocation()`，自动获取用户当前位置作为地图中心
+7. **地址变更**：地址修改不影响已创建的订单（订单中保存的是地址快照）
+8. **默认地址自动填充**：下单页面自动填入用户的默认地址（如存在），减少操作步骤
+
+#### 接口设计
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| GET | `/addresses` | 获取常用地址列表 | PARENT |
+| POST | `/addresses` | 新增地址 | PARENT |
+| PUT | `/addresses/{address_id}` | 修改地址 | PARENT |
+| DELETE | `/addresses/{address_id}` | 删除地址 | PARENT |
+| PUT | `/addresses/{address_id}/default` | 设为默认地址 | PARENT |
+
+#### 与订单/需求的关联
+
+```
+订单创建时:
+  用户选择地址 → 订单表 address 和 address_detail 字段保存地址快照
+  （订单中的 address 字段为 VARCHAR(256)，不关联 user_addresses 表）
+
+需求发布时:
+  用户选择地址 → parent_demands 表的 address / address_detail 字段保存地址快照
+```
+
+#### MVP 阶段简化
+
+| 原设计 | MVP 简化 | 理由 |
+|--------|---------|------|
+| 微信地图定位 | 手动输入地址 + 省市区选择器 | 地图组件开发成本高，P1 接入 |
+| user_addresses 表 | 在 parent_demands 和 orders 表已有 address 字段中存储 | MVP 先不建地址管理独立页面 |
+| 常用地址管理 | P1 阶段实现 | MVP 专注核心交易闭环 |
+
+---
+
 ## 四、教师端（小程序）
 
 ### 4.1 入驻申请
