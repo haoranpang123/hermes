@@ -1,0 +1,19 @@
+{
+  "name": "henu-tutor-miniprogram",
+  "version": "1.0.0",
+  "description": "河大家教微信小程序 - MVP P0",
+  "main": "main.js",
+  "scripts": {
+    "dev:mp-weixin": "uni -p mp-weixin",
+    "build:mp-weixin": "uni build -p mp-weixin"
+  },
+  "dependencies": {
+    "uview-ui": "^2.0.36"
+  },
+  "devDependencies": {
+    "@dcloudio/types": "^3.0.0",
+    "sass": "^1.62.0",
+    "vue": "^3.2.47"
+  },
+  "note": "本项目推荐使用 HBuilderX 打开并运行。uni-app 编译器由 HBuilderX 内置提供。"
+}

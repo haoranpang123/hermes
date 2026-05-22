@@ -1,0 +1,137 @@
+{
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^u-(.*)": "uview-ui/components/u-$1/u-$1.vue"
+    }
+  },
+  "pages": [
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationBarTitleText": "",
+        "navigationStyle": "custom",
+        "backgroundColor": "#F5F5F5"
+      }
+    },
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "河大家教",
+        "backgroundColor": "#F5F5F5"
+      }
+    },
+    {
+      "path": "pages/teacher/detail",
+      "style": {
+        "navigationBarTitleText": "教师详情",
+        "backgroundColor": "#F5F5F5"
+      }
+    },
+    {
+      "path": "pages/order/create",
+      "style": {
+        "navigationBarTitleText": "确认订单",
+        "backgroundColor": "#F5F5F5"
+      }
+    },
+    {
+      "path": "pages/order/list",
+      "style": {
+        "navigationBarTitleText": "我的订单",
+        "backgroundColor": "#F5F5F5"
+      }
+    },
+    {
+      "path": "pages/order/detail",
+      "style": {
+        "navigationBarTitleText": "订单详情",
+        "backgroundColor": "#F5F5F5"
+      }
+    },
+    {
+      "path": "pages/wallet/index",
+      "style": {
+        "navigationBarTitleText": "虚拟币钱包",
+        "backgroundColor": "#F5F5F5"
+      }
+    },
+    {
+      "path": "pages/mine/index",
+      "style": {
+        "navigationBarTitleText": "我的",
+        "backgroundColor": "#F5F5F5"
+      }
+    },
+    {
+      "path": "pages/teacher/apply",
+      "style": {
+        "navigationBarTitleText": "教师入驻申请",
+        "backgroundColor": "#F5F5F5"
+      }
+    },
+    {
+      "path": "pages/teacher/status",
+      "style": {
+        "navigationBarTitleText": "审核状态",
+        "backgroundColor": "#F5F5F5"
+      }
+    },
+    {
+      "path": "pages/teacher/orders",
+      "style": {
+        "navigationBarTitleText": "教师订单",
+        "backgroundColor": "#F5F5F5"
+      }
+    },
+    {
+      "path": "pages/teacher/order-detail",
+      "style": {
+        "navigationBarTitleText": "订单详情",
+        "backgroundColor": "#F5F5F5"
+      }
+    },
+    {
+      "path": "pages/teacher/income",
+      "style": {
+        "navigationBarTitleText": "收入管理",
+        "backgroundColor": "#F5F5F5"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "河大家教",
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "backgroundColor": "#F5F5F5",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#07C160",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "black",
+    "fontSize": "10px",
+    "iconWidth": "20px",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "static/icons/home.png",
+        "selectedIconPath": "static/icons/home-active.png"
+      },
+      {
+        "pagePath": "pages/order/list",
+        "text": "订单",
+        "iconPath": "static/icons/order.png",
+        "selectedIconPath": "static/icons/order-active.png"
+      },
+      {
+        "pagePath": "pages/mine/index",
+        "text": "我的",
+        "iconPath": "static/icons/mine.png",
+        "selectedIconPath": "static/icons/mine-active.png"
+      }
+    ]
+  }
+}

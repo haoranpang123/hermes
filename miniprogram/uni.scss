@@ -1,0 +1,106 @@
+/* ============================================
+ * 河大家教小程序 — Design Tokens (uni.scss)
+ * 基于 design-spec.md 设计规范
+ * 适配 uView UI 2.x
+ * ============================================ */
+
+/* uView UI 主题色覆盖 */
+$u-primary: #07C160;
+$u-warning: #FF976A;
+$u-success: #07C160;
+$u-error: #EE0A24;
+$u-info: #1989FA;
+$u-main-color: #1A1A1A;
+$u-content-color: #666666;
+$u-tips-color: #999999;
+$u-light-color: #CCCCCC;
+$u-border-color: #EBEDF0;
+$u-bg-color: #F5F5F5;
+
+/* 引入 uView 全局样式 */
+@import 'uview-ui/theme.scss';
+
+/* ============================================
+ * 项目 Design Token
+ * ============================================ */
+
+/* 主色调 */
+$app-primary: #07C160;
+$app-primary-dark: #06AD56;
+$app-primary-light: #E8F8EF;
+
+/* 辅助色 */
+$app-link: #1989FA;
+$app-link-light: #EEF4FF;
+
+/* 功能色 */
+$app-danger: #EE0A24;
+$app-danger-light: #FFF0F0;
+$app-warning: #FF976A;
+$app-warning-light: #FFF7EE;
+$app-star: #FF9500;
+
+/* 文字色 */
+$app-text-primary: #1A1A1A;
+$app-text-secondary: #666666;
+$app-text-hint: #999999;
+$app-text-disabled: #CCCCCC;
+
+/* 背景色 */
+$app-bg-page: #F5F5F5;
+$app-bg-card: #FFFFFF;
+
+/* 边框色 */
+$app-border: #EBEDF0;
+$app-border-light: #F0F0F0;
+
+/* 阴影 */
+$app-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.08);
+$app-shadow-light: 0 1px 4px rgba(0, 0, 0, 0.04);
+$app-shadow-search: 0 1px 3px rgba(0, 0, 0, 0.06);
+
+/* 圆角 */
+$app-radius-card: 12px;
+$app-radius-btn: 8px;
+$app-radius-tag: 4px;
+$app-radius-capsule: 20px;
+
+/* 字体族 */
+$app-font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+$app-font-size-xxl: 20px;
+$app-font-size-xl: 18px;
+$app-font-size-lg: 16px;
+$app-font-size-md: 14px;
+$app-font-size-sm: 12px;
+$app-font-size-xs: 10px;
+
+/* 间距 */
+$app-spacing-xs: 4px;
+$app-spacing-sm: 8px;
+$app-spacing-md: 12px;
+$app-spacing-lg: 16px;
+$app-spacing-xl: 20px;
+$app-spacing-xxl: 24px;
+
+/* 组件尺寸 */
+$app-avatar-list: 56px;
+$app-avatar-detail: 72px;
+$app-avatar-order: 44px;
+$app-btn-height: 44px;
+$app-btn-height-lg: 48px;
+$app-btn-height-sm: 32px;
+$app-navbar-height: 44px;
+$app-tabbar-height: 56px;
+$app-input-height: 44px;
+$app-cell-height: 48px;
+
+/* ============================================
+ * 全局辅助类
+ * ============================================ */
+page {
+  font-family: $app-font-family;
+  font-size: $app-font-size-md;
+  color: $app-text-primary;
+  background-color: $app-bg-page;
+  line-height: 1.5;
+}
