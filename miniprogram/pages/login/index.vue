@@ -68,79 +68,129 @@
 </template>
 
 <script>
-import { mockParentUser } from '@/common/mock.js'
+import { post, postData } from '@/utils/api.js'
+import store, { saveLogin, updateUserInfo } from '@/store/index.js'
 
 export default {
   data() {
     return {
       step: 1, // 1=微信登录, 2=手机绑定, 3=身份选择
       loading: false,
-      wxUserInfo: null,
       phone: '',
     }
   },
   methods: {
     /**
      * 步骤1：微信一键登录
-     * 模拟微信登录流程，实际需调用 wx.login() + 后端接口
+     * 调用 wx.login() 获取临时 code，POST /api/v1/auth/login 换取 JWT
      */
-    handleWechatLogin() {
+    async handleWechatLogin() {
       this.loading = true
-      // 模拟微信登录
-      setTimeout(() => {
-        // 模拟获取微信用户信息
-        this.wxUserInfo = {
-          nickname: '小明家长',
-          avatar_url: '',
-          openid: 'mock_openid_' + Date.now(),
+      try {
+        // 1. 调用微信登录获取 code
+        const loginRes = await new Promise((resolve, reject) => {
+          uni.login({
+            success: resolve,
+            fail: reject,
+          })
+        })
+
+        if (!loginRes.code) {
+          uni.showToast({ title: '获取微信授权失败', icon: 'none' })
+          return
         }
+
+        // 2. 调用后端登录接口
+        const data = await postData('/api/v1/auth/login', { code: loginRes.code })
+
+        const { token, user, is_new } = data
+
+        // 3. 保存登录信息到 store
+        saveLogin(token, user, user.role || '')
+
+        // 4. 根据 is_new 决定下一步
+        if (is_new) {
+          // 新用户 → 进入手机号绑定
+          this.step = 2
+        } else if (user.role) {
+          // 老用户已有角色 → 直接跳转
+          this.navigateByRole(user.role)
+        } else {
+          // 老用户但无角色 → 进入身份选择
+          this.step = 3
+        }
+      } catch (err) {
+        uni.showToast({ title: err.message || '登录失败', icon: 'none' })
+      } finally {
         this.loading = false
-        // 进入手机号绑定步骤
-        this.step = 2
-      }, 800)
+      }
     },
 
     /**
-     * 步骤2：获取手机号
-     * 模拟微信 getPhoneNumber 流程
+     * 步骤2：获取手机号并绑定
+     * 微信 getPhoneNumber 回调 → POST /api/v1/auth/bind-phone
      */
-    handleGetPhoneNumber(e) {
+    async handleGetPhoneNumber(e) {
+      const phoneCode = e.detail && e.detail.code
+      if (!phoneCode) {
+        uni.showToast({ title: '获取手机号失败', icon: 'none' })
+        return
+      }
+
       this.loading = true
-      // 模拟获取手机号
-      setTimeout(() => {
-        this.phone = '138****5678'
-        this.loading = false
+      try {
+        // 调用后端绑定手机号
+        const data = await postData('/api/v1/auth/bind-phone', { code: phoneCode })
+
+        // 更新 store 中的用户信息（后端可能返回更新后的 user）
+        if (data.user) {
+          saveLogin(store.user.token, data.user, store.user.role)
+        }
+
+        this.phone = data.phone || '已绑定'
         // 进入身份选择步骤
         this.step = 3
-      }, 500)
+      } catch (err) {
+        uni.showToast({ title: err.message || '绑定手机号失败', icon: 'none' })
+      } finally {
+        this.loading = false
+      }
     },
 
     /**
      * 步骤3：选择身份
+     * 调用 POST /api/v1/auth/select-role 提交角色
      */
-    selectRole(role) {
-      const app = getApp()
-      // 保存用户信息到全局
-      const userInfo = {
-        ...mockParentUser,
-        role: role,
-        phone: this.phone,
+    async selectRole(role) {
+      if (this.loading) return
+      this.loading = true
+      try {
+        // 调用后端选择角色接口
+        const data = await postData('/api/v1/auth/select-role', { role })
+
+        // 用后端返回的最新信息更新 store
+        if (data.user) {
+          saveLogin(store.user.token, data.user, role)
+        } else {
+          // 手动更新 role
+          updateUserInfo({ role })
+        }
+
+        this.navigateByRole(role)
+      } catch (err) {
+        uni.showToast({ title: err.message || '选择身份失败', icon: 'none' })
+      } finally {
+        this.loading = false
       }
-      app.globalData.userInfo = userInfo
-      app.globalData.role = role
-      app.globalData.token = 'mock_token_' + Date.now()
+    },
 
-      // 持久化存储
-      uni.setStorageSync('token', app.globalData.token)
-      uni.setStorageSync('userInfo', userInfo)
-      uni.setStorageSync('role', role)
-
-      // 根据角色跳转
+    /**
+     * 根据角色跳转到对应页面
+     */
+    navigateByRole(role) {
       if (role === 'parent') {
-        // 家长：跳转首页 Tab
         uni.switchTab({ url: '/pages/index/index' })
       } else {
-        // 教师：跳转入驻申请页
         uni.redirectTo({ url: '/pages/teacher/apply' })
       }
     },

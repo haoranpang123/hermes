@@ -77,22 +77,39 @@
 </template>
 
 <script>
-import { mockParentUser, mockWallet } from '@/common/mock.js'
+import store, { clearLogin } from '@/store/index.js'
+import { fetchData } from '@/utils/api.js'
 
 export default {
   data() {
     return {
-      userInfo: mockParentUser,
-      walletBalance: mockWallet.balance,
+      walletBalance: 0,
     }
   },
 
+  computed: {
+    userInfo() {
+      return store.user.userInfo || { nickname: '未登录', avatar_url: '' }
+    },
+  },
+
   onShow() {
-    // 每次显示时更新余额
-    this.walletBalance = mockWallet.balance
+    // 每次显示时从后端获取最新钱包余额
+    this.fetchWallet()
   },
 
   methods: {
+    /**
+     * 获取钱包余额
+     */
+    async fetchWallet() {
+      try {
+        const walletData = await fetchData('/api/v1/wallet')
+        this.walletBalance = walletData.balance || 0
+      } catch (e) {
+        // 保持默认值
+      }
+    },
     /**
      * 编辑资料
      */
@@ -130,10 +147,8 @@ export default {
         content: '退出登录后需要重新授权',
         success: (res) => {
           if (res.confirm) {
-            // 清除登录状态
-            uni.removeStorageSync('token')
-            uni.removeStorageSync('userInfo')
-            uni.removeStorageSync('role')
+            // 通过 store 清除登录状态
+            clearLogin()
             uni.reLaunch({ url: '/pages/login/index' })
           }
         },

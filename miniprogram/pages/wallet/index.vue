@@ -62,34 +62,77 @@
 
 <script>
 import {
-  mockWallet,
-  mockWalletTransactions,
   mockRechargePackages,
 } from '@/common/mock.js'
+import { fetchData, getPaginated, postData } from '@/utils/api.js'
 
 export default {
   data() {
     return {
-      wallet: mockWallet,
-      transactions: mockWalletTransactions,
+      wallet: {
+        balance: 0,
+        total_recharged: 0,
+        total_spent: 0,
+      },
+      transactions: [],
       packages: mockRechargePackages,
     }
   },
 
+  onLoad() {
+    this.loadWallet()
+  },
+
+  onShow() {
+    this.loadWallet()
+  },
+
   methods: {
+    /**
+     * 加载钱包数据
+     */
+    async loadWallet() {
+      try {
+        const wallet = await fetchData('/api/v1/wallet')
+        this.wallet = wallet
+      } catch (e) {
+        // error handled by api util
+      }
+
+      try {
+        const result = await getPaginated('/api/v1/wallet/transactions', {
+          page: 1,
+          page_size: 50,
+        })
+        this.transactions = result.items.map(tx => ({
+          ...tx,
+          // 充值正数，消费负数，适配模板显示
+          amount: tx.type === 'recharge' ? Math.abs(tx.amount) : -Math.abs(tx.amount),
+        }))
+      } catch (e) {
+        // error handled by api util
+      }
+    },
+
     /**
      * 充值
      */
-    handleRecharge(pkg) {
+    async handleRecharge(pkg) {
       uni.showModal({
         title: '确认充值',
-        content: `确认充值 ${pkg.label} 吗？（演示环境）`,
-        success: (res) => {
+        content: `确认充值 ${pkg.label} 吗？`,
+        success: async (res) => {
           if (res.confirm) {
-            // 模拟充值
-            this.wallet.balance += pkg.coins
-            this.wallet.total_recharged += pkg.coins
-            uni.showToast({ title: '充值成功！', icon: 'success' })
+            try {
+              await postData('/api/v1/wallet/recharge', {
+                amount: pkg.amount,
+                coins: pkg.coins,
+              })
+              uni.showToast({ title: '充值成功！', icon: 'success' })
+              this.loadWallet()
+            } catch (e) {
+              // error handled by api util
+            }
           }
         },
       })
