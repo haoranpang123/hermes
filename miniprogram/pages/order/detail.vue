@@ -57,7 +57,7 @@
       <view class="divider" />
       <view class="info-row total-row">
         <text class="info-label">订单金额</text>
-        <text class="info-value amount">¥{{ order.total_amount.toFixed(2) }}</text>
+        <text class="info-value amount">¥{{ order.total_amount ? order.total_amount.toFixed(2) : '0.00' }}</text>
       </view>
     </view>
 
@@ -104,7 +104,7 @@
     <u-modal
       v-model="showConfirmModal"
       title="确认完成"
-      content="确认后平台将自动结算给教师，结算金额为 ¥{{ order.settlement_amount ? order.settlement_amount.toFixed(2) : '0.00' }}。确认后不可撤销。"
+      content="确认后平台将自动结算给教师，结算金额为 ¥{{ order.settlement_amount ? order.settlement_amount.toFixed(2) : order.total_amount ? order.total_amount.toFixed(2) : '0.00' }}。确认后不可撤销。"
       show-cancel-button
       confirm-text="确认完成"
       cancel-text="再想想"
@@ -114,35 +114,45 @@
 </template>
 
 <script>
-import { mockOrders } from '@/common/mock.js'
+import { fetchData, postData } from '@/utils/api.js'
 
 export default {
   data() {
     return {
       order: {},
       showConfirmModal: false,
+      loading: false,
     }
   },
 
   computed: {
     /**
      * 时间线数据
+     * 优先使用API返回的timeline；否则根据status推导
      */
     timelineList() {
-      if (!this.order.timeline) return []
-      return this.order.timeline.map(t => ({
-        title: t.event,
-        desc: t.time,
-      }))
+      if (this.order.timeline && this.order.timeline.length > 0) {
+        return this.order.timeline.map(t => ({
+          title: t.event,
+          desc: t.time,
+        }))
+      }
+      // 根据订单状态推导时间线
+      return this.deriveTimeline()
     },
 
     /**
      * 当前进行到哪一步
      */
     timelineCurrent() {
-      if (!this.order.timeline) return 0
-      const doneCount = this.order.timeline.filter(t => t.status === 'done').length
-      return doneCount - 1 >= 0 ? doneCount - 1 : 0
+      if (this.order.timeline && this.order.timeline.length > 0) {
+        const doneCount = this.order.timeline.filter(t => t.status === 'done').length
+        return doneCount - 1 >= 0 ? doneCount - 1 : 0
+      }
+      // 推导的时间线：取最后一项已完成的索引
+      const list = this.deriveTimeline()
+      const doneIdx = list.length - 1
+      return Math.max(0, doneIdx > 0 ? doneIdx - 1 : 0)
     },
 
     /**
@@ -158,14 +168,86 @@ export default {
 
   onLoad(options) {
     if (options.id) {
-      const order = mockOrders.find(o => o.order_id === parseInt(options.id))
-      if (order) {
-        this.order = { ...order }
-      }
+      this.loadOrder(options.id)
     }
   },
 
   methods: {
+    /**
+     * 加载订单详情 → GET /api/v1/orders/{order_id}
+     */
+    async loadOrder(orderId) {
+      this.loading = true
+      try {
+        const data = await fetchData(`/api/v1/orders/${orderId}`, null, { showLoading: true, loadingText: '加载中...' })
+        this.order = this.mapOrderData(data)
+      } catch (err) {
+        uni.showToast({ title: err.message || '加载失败', icon: 'none' })
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
+     * 映射API返回的订单数据为页面需要格式
+     */
+    mapOrderData(data) {
+      const statusColorMap = {
+        pending_confirm: '#FF976A',
+        pending_trial: '#1989FA',
+        in_progress: '#1989FA',
+        pending_settlement: '#FF976A',
+        completed: '#07C160',
+        cancelled: '#EE0A24',
+        dispute: '#EE0A24',
+      }
+      const statusLabelMap = {
+        pending_confirm: '待确认',
+        pending_trial: '待试课',
+        in_progress: '进行中',
+        pending_settlement: '待结算',
+        completed: '已完成',
+        cancelled: '已取消',
+        dispute: '纠纷中',
+      }
+      return {
+        ...data,
+        status_label: data.status_label || statusLabelMap[data.status] || data.status,
+        status_color: data.status_color || statusColorMap[data.status] || '#999999',
+      }
+    },
+
+    /**
+     * 根据订单status推导时间线（无API timeline时使用）
+     */
+    deriveTimeline() {
+      const status = this.order.status
+      const lines = [
+        { title: '订单已创建', desc: '等待教师确认接单' },
+        { title: '教师已接单', desc: '等待上课日期' },
+        { title: '课程进行中', desc: '教师按时授课' },
+        { title: '家长确认完成', desc: '结算给教师' },
+      ]
+      const statusOrder = ['pending_confirm', 'pending_trial', 'in_progress', 'completed']
+      const currentIdx = statusOrder.indexOf(status)
+      if (currentIdx < 0) {
+        // 已取消或其他状态：显示当前状态
+        const labelMap = {
+          pending_settlement: '家长确认完成',
+          cancelled: '订单已取消',
+          dispute: '订单纠纷中',
+        }
+        const label = labelMap[status] || status
+        return [{ title: label, desc: '' }]
+      }
+      // 已完成：全部绿色
+      if (status === 'completed') {
+        return lines
+      }
+      // 其他状态：当前及之前为活跃
+      return lines.slice(0, currentIdx + 1)
+    },
+
     /**
      * 确认完成
      */
@@ -174,14 +256,22 @@ export default {
     },
 
     /**
-     * 执行确认完成
+     * 执行确认完成 → POST /api/v1/orders/{order_id}/confirm
      */
-    doConfirm() {
-      uni.showToast({ title: '确认成功，感谢使用！', icon: 'success' })
-      this.order.status = 'completed'
-      this.order.status_label = '已完成'
-      this.order.status_color = '#07C160'
-      this.showConfirmModal = false
+    async doConfirm() {
+      try {
+        await postData(`/api/v1/orders/${this.order.order_id}/confirm`, null, {
+          showLoading: true,
+          loadingText: '处理中...',
+        })
+        uni.showToast({ title: '确认成功，感谢使用！', icon: 'success' })
+        this.order.status = 'completed'
+        this.order.status_label = '已完成'
+        this.order.status_color = '#07C160'
+        this.showConfirmModal = false
+      } catch (err) {
+        uni.showToast({ title: err.message || '确认失败', icon: 'none' })
+      }
     },
 
     /**

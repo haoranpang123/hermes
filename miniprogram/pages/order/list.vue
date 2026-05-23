@@ -14,7 +14,7 @@
     <!-- 订单列表 -->
     <view class="order-content">
       <view
-        v-for="order in filteredOrders"
+        v-for="order in orders"
         :key="order.order_id"
         class="order-card"
         @click="goToDetail(order.order_id)"
@@ -39,7 +39,7 @@
             class="order-avatar"
             :style="{ background: order.teacher_avatar_bg || '#E0E0E0' }"
           >
-            <text class="avatar-text">{{ order.teacher_initial || order.teacher_name[0] }}</text>
+            <text class="avatar-text">{{ order.teacher_initial || (order.teacher_name && order.teacher_name[0]) || '老' }}</text>
           </view>
           <view class="order-info">
             <text class="order-teacher">{{ order.teacher_name }}</text>
@@ -54,7 +54,7 @@
         <!-- 订单底部 -->
         <view class="order-footer">
           <text class="order-amount">
-            ¥{{ order.total_amount.toFixed(2) }}
+            ¥{{ order.total_amount ? order.total_amount.toFixed(2) : '0.00' }}
           </text>
           <view class="order-actions">
             <text class="action-link">查看详情 ></text>
@@ -64,7 +64,7 @@
 
       <!-- 空状态 -->
       <u-empty
-        v-if="filteredOrders.length === 0"
+        v-if="!loading && orders.length === 0"
         text="暂无订单"
         mode="list"
         margin-top="80"
@@ -74,42 +74,103 @@
 </template>
 
 <script>
-import { mockOrders, orderStatusMap, parentOrderTabs } from '@/common/mock.js'
+import { getPaginated } from '@/utils/api.js'
+import { orderStatusMap, parentOrderTabs } from '@/common/mock.js'
 
 export default {
   data() {
     return {
       tabs: parentOrderTabs,
       currentTab: 0,
-      orders: mockOrders,
+      orders: [],
+      loading: false,
+      page: 1,
+      pageSize: 20,
+      total: 0,
+      hasMore: true,
     }
   },
 
-  computed: {
-    /**
-     * 根据当前Tab筛选订单
-     */
-    filteredOrders() {
-      const tabValue = this.tabs[this.currentTab].value
-      if (tabValue === 'all') return this.orders
+  onLoad() {
+    this.fetchOrders()
+  },
 
-      // 'active' 包含待试课+进行中+待结算
-      if (tabValue === 'active') {
-        return this.orders.filter(o =>
-          ['pending_trial', 'in_progress', 'pending_settlement'].includes(o.status)
-        )
-      }
+  onShow() {
+    // 每次回到列表页时刷新（可能从详情页返回，状态有变化）
+    this.page = 1
+    this.hasMore = true
+    this.fetchOrders()
+  },
 
-      return this.orders.filter(o => o.status === tabValue)
-    },
+  onPullDownRefresh() {
+    this.page = 1
+    this.hasMore = true
+    this.fetchOrders().finally(() => {
+      uni.stopPullDownRefresh()
+    })
+  },
+
+  onReachBottom() {
+    if (this.hasMore && !this.loading) {
+      this.page++
+      this.fetchOrders(true)
+    }
   },
 
   methods: {
+    /**
+     * 获取当前Tab对应的status筛选值
+     */
+    getFilterStatus() {
+      const tabValue = this.tabs[this.currentTab].value
+      if (tabValue === 'all') return undefined
+      if (tabValue === 'active') return 'active' // 后端处理进行中聚合
+      return tabValue
+    },
+
+    /**
+     * 从API拉取订单列表
+     */
+    async fetchOrders(append = false) {
+      this.loading = true
+      try {
+        const params = {
+          page: this.page,
+          page_size: this.pageSize,
+        }
+        const status = this.getFilterStatus()
+        if (status) {
+          params.status = status
+        }
+
+        const result = await getPaginated('/api/v1/orders', params, { showLoading: !append })
+        const items = result.items
+
+        if (append) {
+          this.orders = [...this.orders, ...items]
+        } else {
+          this.orders = items
+        }
+        this.total = result.total
+        this.hasMore = this.orders.length < this.total
+      } catch (err) {
+        if (!append) {
+          this.orders = []
+        }
+        uni.showToast({ title: err.message || '加载失败', icon: 'none' })
+      } finally {
+        this.loading = false
+      }
+    },
+
     /**
      * Tab切换
      */
     onTabChange(e) {
       this.currentTab = e.index
+      this.page = 1
+      this.hasMore = true
+      this.fetchOrders()
     },
 
     /**
@@ -127,13 +188,6 @@ export default {
         url: `/pages/order/detail?id=${orderId}`,
       })
     },
-  },
-
-  onPullDownRefresh() {
-    // 模拟刷新
-    setTimeout(() => {
-      uni.stopPullDownRefresh()
-    }, 500)
   },
 }
 </script>
