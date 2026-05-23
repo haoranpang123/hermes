@@ -171,7 +171,7 @@
 </template>
 
 <script>
-import { mockTeacherDetail, mockWallet } from '@/common/mock.js'
+import { fetchData, postData, post, del } from '@/utils/api.js'
 
 export default {
   data() {
@@ -183,74 +183,115 @@ export default {
       contactModalContent: '',
       coinModalContent: '',
       teacherId: null,
+      walletBalance: 0,
+      contactCoinCost: 5,
     }
   },
 
-  onLoad(options) {
+  async onLoad(options) {
     if (options.id) {
       this.teacherId = parseInt(options.id)
-      this.loadTeacherDetail(options.id)
+      await this.loadTeacherDetail(options.id)
+      await this.loadWalletBalance()
     }
   },
 
   methods: {
     /**
      * 加载教师详情
-     * 后续替换为 GET /teachers/{teacher_id}
      */
-    loadTeacherDetail(id) {
-      // 模拟API延迟
-      setTimeout(() => {
-        // 根据ID返回不同数据
-        if (parseInt(id) === 1) {
-          this.teacher = { ...mockTeacherDetail }
-        } else {
-          // 其他ID使用基础数据+部分mock数据
-          this.teacher = {
-            ...mockTeacherDetail,
-            teacher_id: parseInt(id),
-          }
-        }
-        this.isFavorited = this.teacher.is_favorited || false
-      }, 200)
+    async loadTeacherDetail(id) {
+      try {
+        const data = await fetchData(`/api/v1/teachers/${id}`)
+        this.teacher = this.normalizeTeacher(data)
+        this.isFavorited = data.is_favorited || false
+      } catch (e) {
+        // error handled by api util
+      }
+    },
+
+    /**
+     * 标准化教师数据，使API响应适配现有模板
+     */
+    normalizeTeacher(data) {
+      return {
+        ...data,
+        // subjects: API返回对象数组 -> 模板期望字符串数组
+        subjects: (data.subjects || []).map(s =>
+          typeof s === 'string' ? s : s.subject
+        ),
+        // certificates: 添加label显示
+        certificates: (data.certificates || []).map(c => ({
+          ...c,
+          label: c.cert_type === 'student_card' ? '学生证' :
+                 c.cert_type === 'award' ? '获奖证书' :
+                 c.cert_type === 'transcript' ? '成绩单' : c.cert_type,
+        })),
+      }
+    },
+
+    /**
+     * 加载钱包余额（用于虚拟币检查）
+     */
+    async loadWalletBalance() {
+      try {
+        const wallet = await fetchData('/api/v1/wallet')
+        this.walletBalance = wallet.balance || 0
+      } catch (e) {
+        this.walletBalance = 0
+      }
     },
 
     /**
      * 收藏/取消收藏
      */
-    toggleFavorite() {
-      this.isFavorited = !this.isFavorited
-      const msg = this.isFavorited ? '已收藏' : '已取消收藏'
-      uni.showToast({ title: msg, icon: 'none' })
+    async toggleFavorite() {
+      try {
+        if (this.isFavorited) {
+          await del(`/api/v1/teachers/${this.teacherId}/favorite`)
+          this.isFavorited = false
+          uni.showToast({ title: '已取消收藏', icon: 'none' })
+        } else {
+          await post(`/api/v1/teachers/${this.teacherId}/favorite`)
+          this.isFavorited = true
+          uni.showToast({ title: '已收藏', icon: 'none' })
+        }
+      } catch (e) {
+        // error handled by api util
+      }
     },
 
     /**
      * 联系教师（消耗虚拟币）
      */
     handleContact() {
-      const coinCost = 5 // MVP固定5币
-      const currentBalance = mockWallet.balance
-
-      if (currentBalance < coinCost) {
-        this.coinModalContent = `查看教师联系方式需要${coinCost}个虚拟币，当前余额${currentBalance}币，余额不足。`
+      if (this.walletBalance < this.contactCoinCost) {
+        this.coinModalContent = `查看教师联系方式需要${this.contactCoinCost}个虚拟币，当前余额${this.walletBalance}币，余额不足。`
         this.showCoinModal = true
         return
       }
 
-      this.contactModalContent = `查看教师联系方式需消耗 ${coinCost} 个虚拟币（约¥${coinCost}），7天内再次查看不重复收费。是否继续？`
+      this.contactModalContent = `查看教师联系方式需消耗 ${this.contactCoinCost} 个虚拟币（约¥${this.contactCoinCost}），7天内再次查看不重复收费。是否继续？`
       this.showContactModal = true
     },
 
     /**
      * 确认查看联系方式
      */
-    confirmContact() {
-      // 模拟扣除虚拟币
-      uni.showToast({
-        title: '联系方式：138****1234',
-        icon: 'none',
-        duration: 3000,
-      })
+    async confirmContact() {
+      try {
+        const result = await postData(`/api/v1/teachers/${this.teacherId}/contact`)
+        const phone = result.phone || result.contact_phone || '暂无'
+        uni.showToast({
+          title: `联系方式：${phone}`,
+          icon: 'none',
+          duration: 3000,
+        })
+        // 刷新余额
+        await this.loadWalletBalance()
+      } catch (e) {
+        // error handled by api util
+      }
       this.showContactModal = false
     },
 
@@ -275,7 +316,14 @@ export default {
      * 查看证书大图
      */
     viewCertificate(cert) {
-      uni.showToast({ title: '查看' + cert.label, icon: 'none' })
+      if (cert.image_url) {
+        uni.previewImage({
+          urls: [cert.image_url],
+          current: cert.image_url,
+        })
+      } else {
+        uni.showToast({ title: '查看' + (cert.label || cert.cert_type), icon: 'none' })
+      }
     },
 
     /**

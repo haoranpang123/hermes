@@ -97,12 +97,17 @@
 </template>
 
 <script>
-import { mockTeacherAuditStatus } from '@/common/mock.js'
+import { fetchData } from '@/utils/api.js'
 
 export default {
   data() {
     return {
-      statusData: { ...mockTeacherAuditStatus },
+      statusData: {
+        status: 'pending',
+        submitted_at: '',
+        reject_reason: '',
+        profile: null,
+      },
     }
   },
 
@@ -132,14 +137,24 @@ export default {
     },
   },
 
-  onLoad() {
-    // 从本地存储读取审核状态
-    const savedStatus = uni.getStorageSync('teacherAuditStatus')
-    if (savedStatus) {
-      this.statusData.status = savedStatus
-      if (savedStatus === 'rejected') {
-        this.statusData.reject_reason = '学生证照片模糊，请重新上传清晰照片'
+  async onLoad() {
+    try {
+      const status = await fetchData('/api/v1/teacher/status')
+      this.statusData.status = status.audit_status || 'pending'
+      this.statusData.submitted_at = status.created_at || ''
+      this.statusData.reject_reason = status.audit_reason || ''
+
+      // 审核通过则加载完整资料
+      if (this.statusData.status === 'approved') {
+        try {
+          const profile = await fetchData('/api/v1/teacher/profile')
+          this.statusData.profile = profile
+        } catch (e) {
+          // profile load failed, not critical
+        }
       }
+    } catch (e) {
+      // fallback: keep default pending
     }
   },
 

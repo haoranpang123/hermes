@@ -231,6 +231,7 @@
 
 <script>
 import { applyOptions } from '@/common/mock.js'
+import { postData } from '@/utils/api.js'
 
 export default {
   data() {
@@ -299,7 +300,6 @@ export default {
      * 上传文件后
      */
     afterRead(event) {
-      // 模拟上传成功
       const files = Array.isArray(event.file) ? event.file : [event.file]
       files.forEach(f => {
         this.certFiles.push({
@@ -319,7 +319,7 @@ export default {
     /**
      * 提交申请
      */
-    handleSubmit() {
+    async handleSubmit() {
       // 表单校验
       if (!this.form.real_name) {
         uni.showToast({ title: '请填写真实姓名', icon: 'none' })
@@ -359,13 +359,34 @@ export default {
       }
 
       this.submitting = true
-      // 模拟提交
-      setTimeout(() => {
+      try {
+        const unitPrice = parseInt(this.form.min_price)
+        const payload = {
+          real_name: this.form.real_name,
+          gender: this.form.gender,
+          university: this.form.university,
+          major: this.form.major,
+          grade: this.form.grade,
+          subjects: this.form.subjects.map(s => ({
+            subject: s,
+            grade_level: null,
+            unit_price: unitPrice,
+          })),
+          teaching_grades: this.form.teaching_grades,
+          min_price: unitPrice,
+          teaching_regions: this.form.teaching_regions,
+          bio: this.form.bio,
+          certificates: this.certFiles.map(f => ({
+            cert_type: 'student_card',
+            image_url: f.url,
+          })),
+        }
+        await postData('/api/v1/teacher/apply', payload)
         this.submitting = false
         this.showSuccess = true
-        // 保存审核状态
-        uni.setStorageSync('teacherAuditStatus', 'pending')
-      }, 1000)
+      } catch (e) {
+        this.submitting = false
+      }
     },
 
     /**

@@ -132,34 +132,42 @@
 
 <script>
 import {
-  mockTeacherOrders,
   teacherOrderTabs,
   orderStatusMap,
 } from '@/common/mock.js'
+import { getPaginated, postData } from '@/utils/api.js'
 
 export default {
   data() {
     return {
       tabs: teacherOrderTabs,
       currentTab: 0,
-      orders: mockTeacherOrders,
+      orders: [],
       showRejectModal: false,
       rejectReason: '',
       currentRejectOrder: null,
+      loading: false,
+      page: 1,
+      total: 0,
     }
   },
 
   computed: {
     filteredOrders() {
-      const tabValue = this.tabs[this.currentTab].value
-      if (tabValue === 'all') return this.orders
-      return this.orders.filter(o => o.status === tabValue)
+      return this.orders
     },
+  },
+
+  onLoad() {
+    this.loadOrders()
   },
 
   methods: {
     onTabChange(e) {
       this.currentTab = e.index
+      this.page = 1
+      this.orders = []
+      this.loadOrders()
     },
 
     getStatusColor(status) {
@@ -171,18 +179,50 @@ export default {
     },
 
     /**
+     * 加载订单
+     */
+    async loadOrders() {
+      if (this.loading) return
+      this.loading = true
+      try {
+        const tabValue = this.tabs[this.currentTab].value
+        const params = {
+          page: this.page,
+          page_size: 20,
+        }
+        if (tabValue !== 'all') {
+          params.status = tabValue
+        }
+        const result = await getPaginated('/api/v1/orders', params)
+        if (this.page === 1) {
+          this.orders = result.items
+        } else {
+          this.orders = this.orders.concat(result.items)
+        }
+        this.total = result.total
+      } catch (e) {
+        // error already toasted by api util
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
      * 确认接单
      */
-    handleAccept(order) {
+    async handleAccept(order) {
       uni.showModal({
         title: '确认接单',
         content: `确认接受订单 ${order.order_no}？`,
-        success: (res) => {
+        success: async (res) => {
           if (res.confirm) {
-            order.status = 'pending_trial'
-            order.status_label = '待试课'
-            order.accepted_at = new Date().toISOString()
-            uni.showToast({ title: '已接单', icon: 'success' })
+            try {
+              await postData(`/api/v1/orders/${order.order_id}/accept`)
+              uni.showToast({ title: '已接单', icon: 'success' })
+              this.loadOrders()
+            } catch (e) {
+              // error handled by api util
+            }
           }
         },
       })
@@ -200,11 +240,16 @@ export default {
     /**
      * 执行拒绝
      */
-    doReject() {
-      if (this.currentRejectOrder) {
-        this.currentRejectOrder.status = 'cancelled'
-        this.currentRejectOrder.status_label = '已取消'
+    async doReject() {
+      if (!this.currentRejectOrder) return
+      try {
+        await postData(`/api/v1/orders/${this.currentRejectOrder.order_id}/reject`, {
+          reason: this.rejectReason || '教师拒绝接单',
+        })
         uni.showToast({ title: '已拒绝', icon: 'none' })
+        this.loadOrders()
+      } catch (e) {
+        // error handled by api util
       }
       this.showRejectModal = false
     },
@@ -212,16 +257,19 @@ export default {
     /**
      * 标记上课
      */
-    handleStart(order) {
+    async handleStart(order) {
       uni.showModal({
         title: '标记上课',
         content: '确认该订单已开始上课？',
-        success: (res) => {
+        success: async (res) => {
           if (res.confirm) {
-            order.status = 'in_progress'
-            order.status_label = '进行中'
-            order.started_at = new Date().toISOString()
-            uni.showToast({ title: '已标记上课', icon: 'success' })
+            try {
+              await postData(`/api/v1/orders/${order.order_id}/start`)
+              uni.showToast({ title: '已标记上课', icon: 'success' })
+              this.loadOrders()
+            } catch (e) {
+              // error handled by api util
+            }
           }
         },
       })
@@ -230,16 +278,19 @@ export default {
     /**
      * 标记完成
      */
-    handleComplete(order) {
+    async handleComplete(order) {
       uni.showModal({
         title: '标记完成',
         content: '确认该订单已完成上课？标记后等待家长确认。',
-        success: (res) => {
+        success: async (res) => {
           if (res.confirm) {
-            order.status = 'completed'
-            order.status_label = '已完成'
-            order.completed_at = new Date().toISOString()
-            uni.showToast({ title: '已标记完成', icon: 'success' })
+            try {
+              await postData(`/api/v1/orders/${order.order_id}/complete`)
+              uni.showToast({ title: '已标记完成', icon: 'success' })
+              this.loadOrders()
+            } catch (e) {
+              // error handled by api util
+            }
           }
         },
       })

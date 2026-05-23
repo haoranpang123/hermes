@@ -108,12 +108,14 @@
 </template>
 
 <script>
-import { mockTeacherOrders, orderStatusMap } from '@/common/mock.js'
+import { orderStatusMap } from '@/common/mock.js'
+import { fetchData, postData } from '@/utils/api.js'
 
 export default {
   data() {
     return {
       order: {},
+      loading: true,
     }
   },
 
@@ -123,11 +125,16 @@ export default {
     },
   },
 
-  onLoad(options) {
+  async onLoad(options) {
     if (options.id) {
-      const order = mockTeacherOrders.find(o => o.order_id === parseInt(options.id))
-      if (order) {
-        this.order = { ...order }
+      try {
+        this.loading = true
+        const data = await fetchData(`/api/v1/orders/${options.id}`)
+        this.order = data
+      } catch (e) {
+        // error handled by api util
+      } finally {
+        this.loading = false
       }
     }
   },
@@ -137,60 +144,90 @@ export default {
       return orderStatusMap[status] || { label: status, color: '#999999', bg: '#F5F5F5' }
     },
 
-    handleAccept() {
+    async handleAccept() {
       uni.showModal({
         title: '确认接单',
         content: '确认接受此订单？',
-        success: (res) => {
+        success: async (res) => {
           if (res.confirm) {
-            this.order.status = 'pending_trial'
-            this.order.status_label = '待试课'
-            uni.showToast({ title: '已接单', icon: 'success' })
+            try {
+              await postData(`/api/v1/orders/${this.order.order_id}/accept`)
+              uni.showToast({ title: '已接单', icon: 'success' })
+              this.refreshOrder()
+            } catch (e) {
+              // error handled by api util
+            }
           }
         },
       })
     },
 
-    handleReject() {
+    async handleReject() {
       uni.showModal({
         title: '拒绝接单',
         content: '确认拒绝此订单？订单将退款给家长。',
-        success: (res) => {
+        success: async (res) => {
           if (res.confirm) {
-            this.order.status = 'cancelled'
-            this.order.status_label = '已取消'
-            uni.showToast({ title: '已拒绝', icon: 'none' })
+            try {
+              await postData(`/api/v1/orders/${this.order.order_id}/reject`, {
+                reason: '教师拒绝接单',
+              })
+              uni.showToast({ title: '已拒绝', icon: 'none' })
+              this.refreshOrder()
+            } catch (e) {
+              // error handled by api util
+            }
           }
         },
       })
     },
 
-    handleStart() {
+    async handleStart() {
       uni.showModal({
         title: '标记上课',
         content: '确认开始上课？',
-        success: (res) => {
+        success: async (res) => {
           if (res.confirm) {
-            this.order.status = 'in_progress'
-            this.order.status_label = '进行中'
-            uni.showToast({ title: '已标记', icon: 'success' })
+            try {
+              await postData(`/api/v1/orders/${this.order.order_id}/start`)
+              uni.showToast({ title: '已标记', icon: 'success' })
+              this.refreshOrder()
+            } catch (e) {
+              // error handled by api util
+            }
           }
         },
       })
     },
 
-    handleComplete() {
+    async handleComplete() {
       uni.showModal({
         title: '标记完成',
         content: '确认课程已完成？标记后等待家长确认。',
-        success: (res) => {
+        success: async (res) => {
           if (res.confirm) {
-            this.order.status = 'completed'
-            this.order.status_label = '已完成'
-            uni.showToast({ title: '已完成', icon: 'success' })
+            try {
+              await postData(`/api/v1/orders/${this.order.order_id}/complete`)
+              uni.showToast({ title: '已完成', icon: 'success' })
+              this.refreshOrder()
+            } catch (e) {
+              // error handled by api util
+            }
           }
         },
       })
+    },
+
+    /**
+     * 刷新订单详情
+     */
+    async refreshOrder() {
+      try {
+        const data = await fetchData(`/api/v1/orders/${this.order.order_id}`)
+        this.order = data
+      } catch (e) {
+        // error handled by api util
+      }
     },
   },
 }

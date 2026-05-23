@@ -66,21 +66,51 @@
 </template>
 
 <script>
-import { mockTeacherIncome, mockTeacherIncomeRecords } from '@/common/mock.js'
+import { fetchData, getPaginated, postData } from '@/utils/api.js'
 
 export default {
   data() {
     return {
-      income: mockTeacherIncome,
-      records: mockTeacherIncomeRecords,
+      income: {
+        withdrawable_balance: 0,
+        total_income: 0,
+        pending_income: 0,
+      },
+      records: [],
     }
+  },
+
+  async onLoad() {
+    await this.loadIncome()
   },
 
   methods: {
     /**
+     * 加载收入数据
+     */
+    async loadIncome() {
+      try {
+        const income = await fetchData('/api/v1/teacher/income')
+        this.income = income
+      } catch (e) {
+        // error handled by api util
+      }
+
+      try {
+        const result = await getPaginated('/api/v1/teacher/income/records', {
+          page: 1,
+          page_size: 50,
+        })
+        this.records = result.items
+      } catch (e) {
+        // error handled by api util
+      }
+    },
+
+    /**
      * 提现
      */
-    handleWithdraw() {
+    async handleWithdraw() {
       if (this.income.withdrawable_balance < 10) {
         uni.showToast({ title: '余额不足最低提现金额', icon: 'none' })
         return
@@ -89,12 +119,20 @@ export default {
       uni.showModal({
         title: '确认提现',
         content: `确认提现 ¥${this.income.withdrawable_balance.toFixed(2)} 到微信零钱？`,
-        success: (res) => {
+        success: async (res) => {
           if (res.confirm) {
-            uni.showToast({
-              title: '提现申请已提交，等待审核',
-              icon: 'success',
-            })
+            try {
+              await postData('/api/v1/teacher/withdraw', {
+                amount: this.income.withdrawable_balance,
+              })
+              uni.showToast({
+                title: '提现申请已提交，等待审核',
+                icon: 'success',
+              })
+              this.loadIncome()
+            } catch (e) {
+              // error handled by api util
+            }
           }
         },
       })
