@@ -97,6 +97,13 @@
         "navigationBarTitleText": "收入管理",
         "backgroundColor": "#F5F5F5"
       }
+    },
+    {
+      "path": "pages/admin/teachers",
+      "style": {
+        "navigationBarTitleText": "教师审核",
+        "backgroundColor": "#F5F5F5"
+      }
     }
   ],
   "globalStyle": {
