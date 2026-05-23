@@ -68,11 +68,15 @@ class TeacherService:
 
         # 创建排课时间
         for sch in req.schedules:
+            # Parse time strings to time objects (required for SQLite compatibility)
+            from datetime import time as dt_time
+            start_t = dt_time.fromisoformat(sch.start_time) if isinstance(sch.start_time, str) else sch.start_time
+            end_t = dt_time.fromisoformat(sch.end_time) if isinstance(sch.end_time, str) else sch.end_time
             ts = TeacherSchedule(
                 teacher_id=teacher.teacher_id,
                 day_of_week=sch.day_of_week,
-                start_time=sch.start_time,
-                end_time=sch.end_time,
+                start_time=start_t,
+                end_time=end_t,
                 status="available",
             )
             self.db.add(ts)
