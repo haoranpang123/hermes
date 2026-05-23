@@ -4,3 +4,9 @@ dist/
 .DS_Store
 *.log
 .hbuilderx/
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+
